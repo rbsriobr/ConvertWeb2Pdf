@@ -62,8 +62,10 @@ namespace ConvertWeb2Pdf
 			{
 				Console.WriteLine ("\n  Usage: ConvertWeb2Pdf <file.txt> <out.pdf>");
 				Console.WriteLine ("\n  This software is published under BSD (3-Clause) License.");
-				Console.WriteLine ("  PDFsharp and MigraDoc are published by empira Software GmbH under MIT License.");
-				Console.WriteLine ("  Wkhtmltopdf is published under LGPLv3 License.");
+				Console.WriteLine ("\n  PDFsharp and MigraDoc are published by empira Software GmbH under MIT License.");
+				Console.WriteLine ("  <http://www.pdfsharp.net/>");
+				Console.WriteLine ("\n  Wkhtmltopdf is published under LGPLv3 License.");
+				Console.WriteLine ("  <https://wkhtmltopdf.org/>");
 				Console.WriteLine ("\n  If you experience bugs or want to request new features please visit");
 				Console.WriteLine ("  <https://github.com/rbsriobr//ConvertWeb2Pdf/issues>");
 				Console.WriteLine ("\n  Copyright 2017 Ricardo Santos");
