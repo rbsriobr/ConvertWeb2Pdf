@@ -1,85 +1,139 @@
-﻿using System;
+﻿using PdfSharp.Drawing;
+using PdfSharp.Pdf;
+using PdfSharp.Pdf.Annotations;
+using PdfSharp.Pdf.IO;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
+using System.Reflection;
+using System.Threading;
 using System.Xml;
 using System.Xml.Linq;
-using PdfSharp.Pdf;
-using PdfSharp.Pdf.IO;
-using PdfSharp.Pdf.Annotations;
-using System.IO;
-using System.Net;
-using System.Threading;
 
 namespace ConvertWeb2Pdf
 {
-	class Program
+	internal class Program
 	{
-		class DocInfo
+		private static void Main (string[] args)
 		{
-			public DocInfo (int npags, int pagoffset, string outfilename, string url, string pagtitle)
-			{
-				OutFileName = outfilename;
-				Url = url;
-				NPags = npags;
-				PagOffset = pagoffset;
-				DocTitle = pagtitle;
-			}
-			public int NPags { get; set; }
-			public int PagOffset { get; set; }
-			public string Url { get; set; }
-			public string OutFileName { get; set; }
-			public string DocTitle { get; set; }
-		}
+			VirtTerm vt = new VirtTerm ( );
 
-		//class ElemArrayComparer : IEqualityComparer<int[]>
-		//{
-		//	private int idx2comp = -1;
+			Workers work = new Workers ( );
 
-		//	public ElemArrayComparer (int _idx2comp)
-		//	{
-		//		idx2comp = _idx2comp;
-		//	}
-
-		//	public bool Equals (int[] x, int[] y)
-		//	{
-		//		return x[idx2comp] == y[idx2comp];
-		//	}
-
-		//	public int GetHashCode (int[] obj)
-		//	{
-		//		return string.Join (",", obj).GetHashCode ( );
-		//	}
-		//}
-
-		static void Main (string[] args)
-		{
-			Work work = new Work ( );
+			work.options = "";
 
 			work.iDoc = 1;
 
-			if (args.Length != 2)
+			work.DefForeColor = Console.ForegroundColor;
+
+			string prodVer  = FileVersionInfo.GetVersionInfo (Assembly.GetExecutingAssembly ( ).Location).ProductVersion;
+			string subject  = "";
+			string author   = "";
+			string keywords = "";
+
+			// obtained from downloading samples with internet speed at 15Mbps
+			float [] fac1 = new float[] { 0.0f, 0.015f, 0.922f, 0.934f, 0.945f, 0.962f, 0.999f, 1.0f };
+
+			DateTime last = DateTime.Now;
+
+			if (args.Length < 2)
 			{
-				Console.WriteLine ("\n  Usage: ConvertWeb2Pdf <file.txt> <out.pdf>");
-				Console.WriteLine ("\n  This software is published under BSD (3-Clause) License.");
-				Console.WriteLine ("\n  PDFsharp and MigraDoc are published by empira Software GmbH under MIT License.");
-				Console.WriteLine ("  <http://www.pdfsharp.net/>");
-				Console.WriteLine ("\n  Wkhtmltopdf is published under LGPLv3 License.");
-				Console.WriteLine ("  <https://wkhtmltopdf.org/>");
-				Console.WriteLine ("\n  If you experience bugs or want to request new features please visit");
-				Console.WriteLine ("  <https://github.com/rbsriobr//ConvertWeb2Pdf/issues>");
-				Console.WriteLine ("\n  Copyright 2017 Ricardo Santos");
+				vt.PrintText ("\n  ConvertWeb2Pdf version " + prodVer);
+				vt.PrintText ("\n\n  Usage: ConvertWeb2Pdf <Yellow,>[options]</> <file.txt> <out.pdf>");
+				vt.PrintText ("\n\n  Options:");
+				vt.PrintText ("\n  <Yellow,>-nc</>, Do not compress pdf");
+				vt.PrintText ("\n  <Yellow,>-dj</>, Disable javascripts");
+				vt.PrintText ("\n  <Yellow,>-ni</>, Do not load images");
+				vt.PrintText ("\n  <Yellow,>-lq</>, Draft quality");
+				vt.PrintText ("\n  <Yellow,>-gs</>, Grayscale printing");
+				vt.PrintText ("\n  <Yellow,>-ab</>, Abort after failure ");
+				vt.PrintText ("\n  <Yellow,>-ti:</>, Timeout in ms (default is infinity) ");
+				vt.PrintText ("\n  <Yellow,>-su:</>, Metadata: Pdf subject. Use <Yellow,>^</> as a space placeholder (e.g. <Yellow,>-su:Pdf^test</> becomes \"Pdf test\")");
+				vt.PrintText ("\n  <Yellow,>-ar:</>, Metadata: Pdf author. Use <Yellow,>^</> as a space placeholder. Use <Yellow,>?</> as a Computer/User placeholder");
+				vt.PrintText ("\n  <Yellow,>-kw:</>, Metadata: Pdf keywords. Comma-delimited items. Use <Yellow,>^</> as a space placeholder");
+				vt.PrintText ("\n\n  This software is published under BSD (3-Clause) License.");
+				vt.PrintText ("\n\n  PDFsharp and MigraDoc are published by empira Software GmbH under MIT License.");
+				vt.PrintText ("\n  <BrightWhite,><http://www.pdfsharp.net/>");
+				vt.PrintText ("\n\n  Wkhtmltopdf is published under LGPLv3 License.");
+				vt.PrintText ("\n  <BrightWhite,><https://wkhtmltopdf.org/>");
+				vt.PrintText ("\n\n  If you experience bugs or want to request new features please visit");
+				vt.PrintText ("\n  <BrightWhite,><https://github.com/rbsriobr//ConvertWeb2Pdf/issues>");
+				vt.PrintText ("\n\n  Copyright 2017 Ricardo Santos\n");
 				return;
 			}
 
-			string InFilename  = args[0];
-			string OutFilename = args[1];
-			OutFilename = OutFilename.Replace (".pdf", "");
+			work.Print (-2, fac1[0], 2);
 
+			for (int k = 0; k < args.Length - 2; k++)
+			{
+				if (args[k].ToLower ( ) == "-nc")
+				{
+					work.options += " --no-pdf-compression ";
+				}
+				else if (args[k].ToLower ( ) == "-dj")
+				{
+					work.options += " --disable-javascript ";
+				}
+				else if (args[k].ToLower ( ) == "-ni")
+				{
+					work.options += " --no-images ";
+				}
+				else if (args[k].ToLower ( ) == "-lq")
+				{
+					work.options += " --lowquality ";
+				}
+				else if (args[k].ToLower ( ) == "-gs")
+				{
+					work.options += " --grayscale ";
+				}
+				else if (args[k].ToLower ( ) == "-ab")
+				{
+					work.abortafter = Workers._abortafter.yes;
+				}
+				else if (args[k].ToLower ( ).Substring (0, 4) == "-ti:")
+				{
+					int res;
+					if (Int32.TryParse (args[k].ToLower ( ).Substring (4), out res))
+					{
+						if (res < 0)
+						{
+							res = -1;
+						}
+						work.timeout = res;
+					}
+				}
+				else if (args[k].ToLower ( ).Substring (0, 4) == "-su:")
+				{
+					subject = args[k].ToLower ( ).Substring (4);
+					subject = subject.Replace ("^", " ");
+				}
+				else if (args[k].ToLower ( ).Substring (0, 4) == "-kw:")
+				{
+					keywords = args[k].ToLower ( ).Substring (4);
+					keywords = keywords.Replace ("^", " ");
+				}
+				else if (args[k].ToLower ( ) == "-ar:?")
+				{
+					author = Environment.MachineName + "/" + Environment.UserName;
+					author = author.Replace ("^", " ");
+				}
+				else if (args[k].ToLower ( ).Substring (0, 4) == "-ar:")
+				{
+					author = args[k].ToLower ( ).Substring (4);
+					author = author.Replace ("^", " ");
+				}
+			}
+
+			string InFilename  = args[args.Length - 2];
+			string OutFilename = args[args.Length - 1];
+
+			OutFilename = OutFilename.Replace (" ", "_").Replace (".pdf", "");
 
 			if (!File.Exists (InFilename))
 			{
-				Console.WriteLine ("File not found: " + InFilename);
+				vt.PrintText ("\n\n <Red,>File not found:</> " + InFilename);
 				return;
 			}
 
@@ -109,13 +163,15 @@ namespace ConvertWeb2Pdf
 
 					if ((h = Urilist.IndexOf (Line)) != -1)
 					{
-						Console.WriteLine ("\rDuplicate URL found in file. Lines: " + j.ToString ( ) + ", " + (h + 1).ToString ( ));
-						return;
+						vt.PrintText ("\r <Yellow,>Duplicate URL found in file.</> Lines: " + j.ToString ( ) + ", " + (h + 1).ToString ( ));
+						j++;
+						continue;
 					}
 					if (!Uri.TryCreate (Line, UriKind.Absolute, out test))
 					{
-						Console.WriteLine ("\rInvalid URL. Line: " + j.ToString ( ));
-						return;
+						vt.PrintText ("\r <Yellow,>Invalid URL.</> Line: " + j.ToString ( ));
+						j++;
+						continue;
 					}
 
 					j++;
@@ -129,7 +185,7 @@ namespace ConvertWeb2Pdf
 
 				inFile.Close ( );
 
-				work.elemArray = new Object[work.docInfoList.Count + 2];
+				work.elemArray = new Object[(work.docInfoList.Count * 2) + 2];
 
 				string now = DateTime.Now.ToString ( );
 				string docname = "ConvertWeb2Pdf - " + now;
@@ -144,11 +200,19 @@ namespace ConvertWeb2Pdf
 				work.exeFileName = Path.GetDirectoryName (System.Reflection.Assembly.GetEntryAssembly ( ).Location);
 				work.exeFileName = work.exeFileName + "\\" + "wkhtmltopdf.exe";
 
+				work.Print (work.iDoc, fac1[1], 2);
+
+				work.fac = fac1[2];
+
 				Directory.SetCurrentDirectory (Directory.GetCurrentDirectory ( ) + "\\" + now + "\\");
 
 				work.curDir = Directory.GetCurrentDirectory ( );
 
 				Console.CursorVisible = false;
+
+				////////////////////
+				//	Download web  //
+				////////////////////
 
 				Thread thread1 = new Thread (new ThreadStart (work.DoWork));
 
@@ -166,21 +230,109 @@ namespace ConvertWeb2Pdf
 
 				thread4.Start ( );
 
-				thread1.Join ( );
-				thread2.Join ( );
-				thread3.Join ( );
-				thread4.Join ( );
+				bool stop = false;
+
+				while (!stop)
+				{
+					stop = thread1.Join (250);
+					stop &= thread2.Join (250);
+					stop &= thread3.Join (250);
+					stop &= thread4.Join (250);
+
+					work.Print (work.iDoc, fac1[2], 2);
+				}
+
+				if ((work.abortafter == Workers._abortafter.yes) || (work.abortafter == Workers._abortafter.all))
+				{
+					return;
+				}
+
+				//////////////////////////////////////////////////////
+				//	Test of corrupted pdf files and get page count  //
+				//////////////////////////////////////////////////////
+
+				int pagOffset = 1;
+
+				for (int idoc = 0; idoc < work.docInfoList.Count; idoc++)
+				{
+					j = 0;
+
+					if (work.docInfoList.ElementAt (idoc).Exists)
+					{
+						while (true)
+						{
+							try
+							{
+								using (PdfDocument inputDocument = PdfReader.Open (work.docInfoList.ElementAt (idoc).DocFileName, PdfDocumentOpenMode.Import))
+								{
+									work.docInfoList.ElementAt (idoc).NPags = inputDocument.PageCount;
+									work.docInfoList.ElementAt (idoc).PagOffset = pagOffset;
+									pagOffset += inputDocument.PageCount;
+								}
+							}
+							catch (Exception ex)
+							{
+								if (++j > 2)
+								{
+									vt.PrintText ("\n\n <Red,>File deleteted: file seems corrupted.");
+									try
+									{
+										File.Delete (work.docInfoList.ElementAt (idoc).DocFileName);
+									}
+									catch (System.IO.IOException)
+									{ }
+									break;
+								}
+								vt.PrintText ("\n\n <Yellow,>Exception on opening file</> <" + work.docInfoList.ElementAt (idoc).DocFileName +
+									">: " + ex.Message + " " + j.ToString ( ) + " of 3 attempts.");
+								Thread.Sleep (1500);
+								continue;
+							}
+							break;
+						}
+						if (j > 0 && j < 3)
+						{
+							vt.PrintText ("\n\n <Green,>Ok:</> " + (j + 1).ToString ( ) + " of 3 attempts.");
+							j = 0;
+						}
+					}
+				}
+
+				////////////////////////////////////////
+				//	Create a html file with contents  //
+				////////////////////////////////////////
+
+				for (int idoc = 1; idoc < work.docInfoList.Count; idoc++)
+				{
+					if (work.docInfoList.ElementAt (idoc).Exists)
+					{
+						work.elemArray[idoc * 2] = new XElement ("p",
+														new XElement ("a",
+															new XAttribute ("href", work.docInfoList.ElementAt (idoc).Url),
+															idoc.ToString ( ) + " - " + work.docInfoList.ElementAt (idoc).DocTitle));
+					}
+					else
+					{
+						work.elemArray[idoc * 2] = new XElement ("p",
+																	new XElement ("font",
+																		new XAttribute ("color", "red"),
+																		idoc.ToString ( ) + " Failed to download !"));
+					}
+					work.elemArray[(idoc * 2) + 1] = new XElement ("p",
+																	new XAttribute ("style", "text-indent: 2em"),
+																	new XElement ("small", "\t\t" + work.docInfoList.ElementAt (idoc).Url));
+				}
 
 				var xDocument = new XDocument (
-					new XDocumentType ("html", null, null, null),
-						new XElement ("html",
-						new XElement ("head",
-							new XElement ("title", docname),
-							new XElement ("meta",
-								new XAttribute ("content", "text/html; charset=UTF-8"),
-								new XAttribute ("http-equiv", "content-type"))),
-						new XElement ("body", work.elemArray)
-						));
+										new XDocumentType ("html", null, null, null),
+											new XElement ("html",
+											new XElement ("head",
+												new XElement ("title", docname),
+												new XElement ("meta",
+													new XAttribute ("content", "text/html; charset=UTF-8"),
+													new XAttribute ("http-equiv", "content-type"))),
+											new XElement ("body", work.elemArray)
+											));
 
 				var settings = new XmlWriterSettings
 				{
@@ -194,93 +346,163 @@ namespace ConvertWeb2Pdf
 					xDocument.WriteTo (writer);
 				}
 
+				work.totalbytessec = 0;
+
+				work.Print (work.iDoc, fac1[3], 2);
+
+				///////////////////////////
+				//	Convert html to pdf  //
+				///////////////////////////
+
 				System.Diagnostics.Process pProcess = new System.Diagnostics.Process ( );
 
-				pProcess.ErrorDataReceived += pProcess_ErrorDataReceived;
+				//pProcess.ErrorDataReceived += pProcess_ErrorDataReceived;
 
-				pProcess.StartInfo.CreateNoWindow = true;
-				pProcess.StartInfo.UseShellExecute = false;
-				pProcess.StartInfo.FileName = work.exeFileName;
+				pProcess.StartInfo.CreateNoWindow   = true;
+				pProcess.StartInfo.UseShellExecute  = false;
+				pProcess.StartInfo.FileName         = work.exeFileName;
 				pProcess.StartInfo.WorkingDirectory = work.curDir;
 
-				pProcess.StartInfo.Arguments = "\"" + OutFilename + "0.html" + "\" \"" + OutFilename + "0.pdf";
+				pProcess.StartInfo.Arguments = work.options + " \"" + OutFilename + "0.html" + "\" \"" + OutFilename + "0.pdf";
 
 				pProcess.Start ( );
 
-				pProcess.WaitForExit ( );
-
-				work.Print (-1);
-
-				PdfDocument inputDocument = null;
-
-				int pagOffset = 1;
-
-				for (int i= 0; i < work.docInfoList.Count; i++)
+				if (work.timeout >= 0)
 				{
-					inputDocument = PdfReader.Open (work.docInfoList.ElementAt (i).OutFileName, PdfDocumentOpenMode.Import);
-					work.docInfoList.ElementAt (i).NPags = inputDocument.PageCount;
-					work.docInfoList.ElementAt (i).PagOffset = pagOffset;
-					pagOffset += inputDocument.PageCount;
-					//inputDocument.Close ( );
+					bool state = pProcess.WaitForExit (work.timeout);
+					if (!pProcess.HasExited)
+					{
+						pProcess.Kill ( );
+					}
+					if (!state)
+					{
+						try
+						{
+							File.Delete (OutFilename + "0.pdf");
+						}
+						catch (System.IO.IOException)
+						{ }
+						vt.PrintText ("\n\n <Yellow,>Process killed:</> the file <" + OutFilename + "0.pdf> was not created from <" +
+							OutFilename + "0.html> because it exeeded timeout.");
+					}
+				}
+				else
+				{
+					pProcess.WaitForExit ( );
 				}
 
-				PdfDocument outputDocument = new PdfDocument ( );
+				work.Print (work.iDoc, fac1[4], 2);
 
-				Dictionary<string, DocInfo> Url2Info = work.docInfoList.ToDictionary (p => p.Url);
+				//////////////////
+				//	Merge pdfs  //
+				//////////////////
 
-				Dictionary<string, int> Url2PagOffset = Url2Info.ToDictionary (i => i.Key, i => i.Value.PagOffset);
+				int doc0len = 0;
 
-				// merge docs
-				for (int idoc = 0; idoc < work.docInfoList.Count; idoc++)
+				using (PdfDocument outputDocument = new PdfDocument ( ))
 				{
-					inputDocument = PdfReader.Open (work.docInfoList.ElementAt (idoc).OutFileName, PdfDocumentOpenMode.Import);
-
-					string DocTitle = work.docInfoList.ElementAt (idoc).DocTitle;
-
-					for (int ipag = 0; ipag < inputDocument.PageCount; ipag++)
+					for (int idoc = 0; idoc < work.docInfoList.Count; idoc++)
 					{
-						PdfPage page = inputDocument.Pages[ipag];
-						outputDocument.AddPage (page);
+						if (work.docInfoList.ElementAt (idoc).Exists)
+						{
+							using (PdfDocument inputDocument = PdfReader.Open (OutFilename + idoc.ToString ( ) + ".pdf", PdfDocumentOpenMode.Import))
+							{
+								if (idoc == 0)
+								{
+									doc0len = inputDocument.PageCount;
+								}
+								for (int ipag = 0; ipag < inputDocument.PageCount; ipag++)
+								{
+									AddPage (outputDocument, inputDocument.Pages[ipag]);
+								}
+							}
+						}
+					}
+					outputDocument.Save ("temp.pdf");
+					outputDocument.Close ( );
+				}
+
+				////////////////////////
+				//	Update pdf links  //
+				////////////////////////
+
+				Dictionary<string, int> Url2PagOffset = work.docInfoList.ToDictionary (p => p.Url).ToDictionary (i => i.Key, i => i.Value.PagOffset);
+
+				work.Print (work.iDoc, fac1[5], 2);
+
+				using (PdfDocument pdfDoc = PdfReader.Open ("temp.pdf", PdfDocumentOpenMode.Modify))
+				{
+					UpdateDoc (pdfDoc, Url2PagOffset, "Contents", doc0len);
+
+					if (pdfDoc.Pages.Count > 0)
+					{
+						pdfDoc.Info.Creator = "ConvertWeb2Pdf vs " + prodVer;
+						pdfDoc.Info.Subject = subject;
+						pdfDoc.Info.Keywords = keywords;
+						pdfDoc.Info.Author = author;
+
+						pdfDoc.Save (OutFilename + ".pdf");
+						pdfDoc.Close ( );
 					}
 				}
 
-				outputDocument.Save ("temp.pdf");
+				work.Print (work.iDoc, fac1[6], 2);
 
-				outputDocument.Close ( );
+				//////////////////////////////
+				//	Delete temporary files  //
+				//////////////////////////////
 
-				outputDocument = new PdfDocument ( );
-
-				inputDocument = PdfReader.Open ("temp.pdf", PdfDocumentOpenMode.Import);
-
-				for (int ipag = 0; ipag < inputDocument.PageCount; ipag++)
+				try
 				{
-					PdfPage page = inputDocument.Pages[ipag];
+					for (int idoc = 0; idoc < work.docInfoList.Count; idoc++)
+					{
+						File.Delete (OutFilename + idoc.ToString ( ) + ".pdf");
+					}
 
-					page = UpdatePage (page, Url2PagOffset, "Contents");
-
-					outputDocument.AddPage (page);
+					File.Delete ("temp.pdf");
+					File.Delete (OutFilename + "0.html");
 				}
-
-				outputDocument.Save (OutFilename + ".pdf");
-
-				outputDocument.Close ( );
-
-				File.Delete ("temp.pdf");
-				File.Delete (OutFilename + "0.html");
-
+				catch (System.IO.IOException)
+				{ }
+			}
+			catch (PdfSharp.Pdf.IO.PdfReaderException ex)
+			{
+				vt.PrintText ("\n\n <Red,>PdfSharp.Pdf.IO.PdfReaderException:</> " + ex.Message);
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine ("Exception: " + ex.Message);
+				vt.PrintText ("\n\n <Red,>Exception:</> " + ex.Message);
 			}
+
+			work.Print (work.iDoc, fac1[7], 2);
 
 			Console.CursorVisible = true;
 		}
 
-		static void pProcess_ErrorDataReceived (object sender, System.Diagnostics.DataReceivedEventArgs e)
+		private static void AddPage (PdfDocument destDoc, PdfPage inPage)
 		{
-			throw new NotImplementedException ( );
+			destDoc.AddPage (inPage);
+
+			PdfPage outpage = destDoc.Pages[destDoc.PageCount - 1];
+
+			foreach (PdfAnnotation anot in inPage.Annotations.OfType<PdfAnnotation> ( ))
+			{
+				PdfString uri = null;
+				foreach (PdfDictionary dicitem in anot.Elements.Values.OfType<PdfDictionary> ( ))
+				{
+					uri = dicitem.Elements["/URI"] as PdfString;
+				}
+				if (uri != null)
+				{
+					outpage.AddWebLink (anot.Rectangle, uri.Value);
+				}
+			}
 		}
+
+		//static void pProcess_ErrorDataReceived (object sender, System.Diagnostics.DataReceivedEventArgs e)
+		//{
+		//	throw new NotImplementedException ( );
+		//}
 
 		static public string RemoveEscEtc (string text, bool removefragment = true)
 		{
@@ -298,8 +520,7 @@ namespace ConvertWeb2Pdf
 			return newtext;
 		}
 
-
-		static bool URICompare (string str1, string str2)
+		private static bool URICompare (string str1, string str2)
 		{
 			if (Uri.Compare (
 				new Uri (str1), new Uri (str2),
@@ -311,178 +532,52 @@ namespace ConvertWeb2Pdf
 			return false;
 		}
 
-		static public PdfPage UpdatePage (PdfPage page, Dictionary<string, int> url2pagoffset, string pagtitle)
+		static public void UpdateDoc (PdfDocument doc, Dictionary<string, int> url2pagoffset, string pagtitle, int pag0len)
 		{
 			PdfString uri;
 
-			for (int ianot = 0; ianot < page.Annotations.Count; ianot++)
+			for (int ipag = 0; ipag < doc.PageCount; ipag++)
 			{
-				PdfAnnotation anot = page.Annotations.ElementAt (ianot) as PdfAnnotation;
+				PdfPage outpage = doc.Pages[ipag];
 
-				PdfRectangle rect = anot.Rectangle as PdfRectangle;
-
-				PdfRectangle newrect = rect.Clone ( );
-
-				foreach (PdfItem kpitem in anot.Elements.Values)
+				for (int ianot = 0; ianot < outpage.Annotations.Count; ianot++)
 				{
-					PdfDictionary dicitem = kpitem as PdfDictionary;
+					PdfAnnotation anot = outpage.Annotations[ianot] as PdfAnnotation;
 
-					if (dicitem != null)
+					foreach (PdfDictionary dicitem in anot.Elements.Values.OfType<PdfDictionary> ( ))
 					{
 						if ((uri = dicitem.Elements["/URI"] as PdfString) != null)
 						{
 							foreach (string urikey in url2pagoffset.Keys)
 							{
-								string urikey2 = RemoveEscEtc (urikey);
-
 								Uri test = null;
-								if (Uri.TryCreate (urikey2, UriKind.Absolute, out test))
+								string urikey2;
+								try
 								{
-									if (URICompare (uri.Value, urikey2))
+									urikey2 = RemoveEscEtc (urikey);
+
+									if (Uri.TryCreate (urikey2, UriKind.Absolute, out test))
 									{
-										page.Annotations.Remove (anot);
-										PdfLinkAnnotation linkanot = page.AddDocumentLink (newrect, url2pagoffset[urikey2]);
-										linkanot.Title = pagtitle;
-										linkanot.Title += " (page " + url2pagoffset[urikey2].ToString ( ) + ")";
-										ianot = -1; // iterate again from 0
-										break;
+										if (URICompare (uri.Value, urikey2))
+										{
+											PdfRectangle rect = anot.Rectangle as PdfRectangle;
+											PdfRectangle newrect = rect.Clone ( );
+
+											int pagnumb = url2pagoffset[urikey] + pag0len;
+											PdfLinkAnnotation linkanot = outpage.AddDocumentLink (newrect, pagnumb);
+
+											linkanot.Title = pagtitle;
+											linkanot.Title += " (page " + pagnumb.ToString ( ) + ")";
+
+											anot.Rectangle = new PdfRectangle (new XRect (0d, 0d, 0d, 0d));
+										}
 									}
 								}
+								catch (Exception)
+								{ }
 							}
 						}
 					}
-					if (ianot == -1)
-					{
-						break;
-					}
-				}
-			}
-			return page;
-		}
-
-		class Work
-		{
-			public int iDoc           = 1;
-			public String exeFileName = "";
-			public String curDir      = "";
-			public Object [] elemArray;
-			private Regex regEx = new Regex ("<title>(.*?)</title>");
-
-			public List<DocInfo> docInfoList = new List<DocInfo> ( );
-
-			public void Print (int curDoc)
-			{
-				int per = curDoc < 0 ? 100 : (int)(((float)curDoc / (float)docInfoList.Count) * 100f);
-
-				string sym = "";
-				switch (curDoc % 4)
-				{
-					case 0: sym = "| "; break;
-					case 1: sym = "/ "; break;
-					case 2: sym = "─ "; break;
-					case 3: sym = "\\ "; break;
-				}
-
-				Console.Write ("\r " + per.ToString ( ) + "% " + sym + "       ");
-			}
-
-			private string GetTitle (ref WebClient wc, string url)
-			{
-				String title = "";
-
-				int i = 0;
-
-				//Uri test = null;
-				//if (!Uri.TryCreate (url, UriKind.Absolute, out test))
-				//{
-				//	return "<" + url + ">";
-				//}
-
-				while (true)
-				{
-					try
-					{
-						string html = wc.DownloadString (url);
-
-						html = html.Replace ("\n", "").Replace ("\r", "").Replace ("\t", "");
-
-						MatchCollection mc = regEx.Matches (html);
-
-						if (mc.Count > 0)
-						{
-							title = mc[0].Value.Replace ("<title>", "").Replace ("</title>", "");
-						}
-					}
-					catch (System.Net.WebException ex)
-					{
-						if (++i < 3)
-						{
-							Console.WriteLine ("Exception: " + ex.Message + " <" + url + ">");
-							break;
-						}
-						Console.Write (" " + i.ToString ( ) + "/3");
-						Thread.Sleep (500);
-						continue;
-					}
-					if (string.IsNullOrEmpty (title))
-					{
-						title = "<" + url + ">";
-					}
-					break;
-				}
-				return title;
-			}
-
-			public void DoWork ( )
-			{
-				WebClient wc = new WebClient ( );
-
-				String Url  = null;
-				int curDoc;
-
-				while (true)
-				{
-					curDoc = iDoc++;
-
-					if (curDoc >= docInfoList.Count)
-					{
-						iDoc = docInfoList.Count;
-						break;
-					}
-
-					Print (curDoc);
-
-					DocInfo docInfo = docInfoList.ElementAt (curDoc);
-
-					Url = docInfo.Url;
-
-					docInfo.DocTitle = GetTitle (ref wc, Url);
-
-					System.Diagnostics.Process pProcess = new System.Diagnostics.Process ( );
-
-					pProcess.ErrorDataReceived += pProcess_ErrorDataReceived;
-
-					if (!File.Exists (exeFileName))
-					{
-						Console.WriteLine ("File not found: " + exeFileName);
-						return;
-					}
-
-					pProcess.StartInfo.CreateNoWindow = true;
-					pProcess.StartInfo.UseShellExecute = false;
-					pProcess.StartInfo.FileName = exeFileName;
-					pProcess.StartInfo.WorkingDirectory = curDir;
-
-					pProcess.StartInfo.Arguments = "\"" + Url + "\" \"" + docInfo.OutFileName + "\"";
-
-					elemArray[curDoc + 2] = new XElement ("p",
-						new XElement ("a",
-							new XAttribute ("href", Url),
-							curDoc.ToString ( ) + " - " + docInfo.DocTitle));
-
-					pProcess.Start ( );
-
-					pProcess.WaitForExit ( );
 				}
 			}
 		}
