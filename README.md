@@ -1,6 +1,6 @@
 # ConvertWeb2Pdf
---------------
-This software downloads websites listed in a .txt file and converts them to a single .pdf file. (Website to pdf converter)
+
+**This software downloads websites listed in a .txt file and converts them to a single .pdf file. (Website to pdf converter)**
 
 ConvertWeb2Pdf version 1.1.0.0
 
