@@ -30,3 +30,4 @@ Options:
   <https://github.com/rbsriobr//ConvertWeb2Pdf/issues>
 
   Copyright 2017 Ricardo Santos
+  
