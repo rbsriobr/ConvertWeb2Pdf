@@ -2,6 +2,8 @@
 
 **This software downloads websites listed in a .txt file and converts them to a single .pdf file. (Website to pdf converter)**
 
+[If you like the software, please consider a donation.](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=EQB8AHB496WSG "Donate now with PayPal")
+
 ConvertWeb2Pdf version 1.1.0.0
 
   **Usage:** ConvertWeb2Pdf [options] <file.txt> <out.pdf>
